@@ -74,7 +74,9 @@ The app requires **Screen Recording** permission in System Settings > Privacy & 
 - **Architecture**: SwiftUI views + `@EnvironmentObject` for shared state
 - **Testing**: Use the Testing framework for unit tests, XCUIAutomation for UI tests
 
+### Screenshot Naming
+Screenshots are named `SS_1.png`, `SS_2.png`, etc. On each capture start, the app scans the save directory for existing `SS_N.png` files and resumes from the highest N found. If the directory is empty, the counter starts at 1.
+
 ## Known Issues / TODOs
 - `sendToLLM()` is fully implemented but requires a running vLLM server with a chat-template-compatible model (e.g., `gemma-4-31b-it` or base model with `--chat-template` flag)
-- Screenshot naming: `SS_1.png`, `SS_2.png`, etc. — counter resets each session
 - No persistence of settings between launches

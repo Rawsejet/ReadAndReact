@@ -52,8 +52,6 @@ class CaptureState: ObservableObject {
             return
         }
 
-        // Reset counter
-        screenshotCount = 0
         isCapturing = true
         statusMessage = "Capturing..."
 
@@ -62,6 +60,9 @@ class CaptureState: ObservableObject {
             atPath: savePath,
             withIntermediateDirectories: true
         )
+
+        // Resume counter from the highest existing SS_N.png in the save directory
+        screenshotCount = findHighestScreenshotNumber(in: savePath)
 
         screenshotService = ScreenshotService(overlayPanel: panel)
 
@@ -79,6 +80,22 @@ class CaptureState: ObservableObject {
         captureTimer = nil
         isCapturing = false
         statusMessage = "Stopped. \(screenshotCount) screenshot\(screenshotCount == 1 ? "" : "s") taken."
+    }
+
+    /// Scans the directory for existing SS_N.png files and returns the highest N found (or 0 if none).
+    private func findHighestScreenshotNumber(in directory: String) -> Int {
+        let fm = FileManager.default
+        guard let contents = try? fm.contentsOfDirectory(atPath: directory) else { return 0 }
+        var highest = 0
+        for name in contents {
+            // Match "SS_123.png" pattern
+            if name.hasPrefix("SS_") && name.hasSuffix(".png"),
+               let numStr = name.dropFirst(3).dropLast(4).description as String?,
+               let num = Int(numStr) {
+                highest = max(highest, num)
+            }
+        }
+        return highest
     }
 
     // MARK: - Screenshot
