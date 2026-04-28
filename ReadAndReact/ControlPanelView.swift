@@ -59,6 +59,15 @@ struct ControlPanelView: View {
                         .disabled(!captureState.isCapturing)
                         .buttonStyle(.borderedProminent)
                         .tint(.red)
+
+                        Button {
+                            captureState.clearScreenshots()
+                        } label: {
+                            Label("Clear", systemImage: "trash")
+                        }
+                        .disabled(captureState.isCapturing || captureState.screenshotCount == 0)
+                        .buttonStyle(.borderedProminent)
+                        .tint(.orange)
                     }
 
                     Divider()

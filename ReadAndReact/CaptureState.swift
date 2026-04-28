@@ -20,7 +20,7 @@ class CaptureState: ObservableObject {
     }()
     @Published var screenshotCount: Int = 0
     @Published var lastScreenshotThumbnail: NSImage? = nil
-    @Published var llmPrompt: String = ""
+    @Published var llmPrompt: String = "Here are a bunch of screenshots of a chat. I need you to parse the text and give me the output of the chat. Be sure to includet he person's name and the time stamps with each message. Some of the images will be overlapping so watch out for that."
     @Published var llmEndpoint: String = "http://localhost:8000"
     @Published var llmModel: String = "google/gemma-4-31b-it"
     @Published var llmResponse: String = ""
@@ -108,6 +108,25 @@ class CaptureState: ObservableObject {
             }
         }
         return highest
+    }
+
+    // MARK: - Clear Screenshots
+
+    func clearScreenshots() {
+        let fm = FileManager.default
+        guard let contents = try? fm.contentsOfDirectory(atPath: savePath) else {
+            statusMessage = "Nothing to clear"
+            return
+        }
+        var deleted = 0
+        for name in contents where name.hasPrefix("SS_") && name.hasSuffix(".png") {
+            let path = (savePath as NSString).appendingPathComponent(name)
+            try? fm.removeItem(atPath: path)
+            deleted += 1
+        }
+        screenshotCount = 0
+        lastScreenshotThumbnail = nil
+        statusMessage = "Cleared \(deleted) screenshot\(deleted == 1 ? "" : "s")"
     }
 
     // MARK: - Screenshot
