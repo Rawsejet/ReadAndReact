@@ -24,6 +24,11 @@ struct ControlPanelView: View {
                         TextField("5", value: $captureState.intervalSeconds, format: .number)
                             .frame(width: 60)
                             .textFieldStyle(.roundedBorder)
+                        Spacer()
+                        Toggle("Overlay", isOn: $captureState.isOverlayVisible)
+                            .onChange(of: captureState.isOverlayVisible) {
+                                captureState.updateOverlayVisibility()
+                            }
                     }
 
                     HStack {

@@ -26,12 +26,24 @@ class CaptureState: ObservableObject {
     @Published var llmResponse: String = ""
     @Published var isSendingToLLM: Bool = false
     @Published var statusMessage: String = "Ready"
+    @Published var isOverlayVisible: Bool = true
 
     /// Set by AppDelegate after the overlay panel is created
     var overlayPanel: OverlayPanel?
 
     private var captureTimer: Timer?
     private var screenshotService: ScreenshotService?
+
+    // MARK: - Overlay Visibility
+
+    func updateOverlayVisibility() {
+        guard let panel = overlayPanel else { return }
+        if isOverlayVisible {
+            panel.orderFront(nil)
+        } else {
+            panel.orderOut(nil)
+        }
+    }
 
     // MARK: - Capture Control
 
