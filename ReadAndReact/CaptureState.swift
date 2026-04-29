@@ -21,8 +21,8 @@ class CaptureState: ObservableObject {
     @Published var screenshotCount: Int = 0
     @Published var lastScreenshotThumbnail: NSImage? = nil
     @Published var llmPrompt: String = "Here are a bunch of screenshots of a chat. I need you to parse the text and give me the output of the chat. Be sure to includet he person's name and the time stamps with each message. Some of the images will be overlapping so watch out for that."
-    @Published var llmEndpoint: String = "http://localhost:8000"
-    @Published var llmModel: String = "google/gemma-4-31b-it"
+    @Published var llmEndpoint: String = "http://192.168.1.154:8085"
+    @Published var llmModel: String = "gemma-4-31b-it"
     @Published var llmResponse: String = ""
     @Published var isSendingToLLM: Bool = false
     @Published var statusMessage: String = "Ready"

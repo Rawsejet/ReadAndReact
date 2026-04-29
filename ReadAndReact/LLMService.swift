@@ -13,7 +13,6 @@ import AppKit
 struct LLMService {
 
     /// Sends all screenshots from the save directory to the vLLM endpoint with the given prompt.
-    /// Screenshots are sent in order (SS_1, SS_2, ...) as base64-encoded images in a single user message.
     static func send(
         screenshotDirectory: String,
         screenshotCount: Int,
@@ -21,18 +20,14 @@ struct LLMService {
         endpoint: String,
         model: String
     ) async throws -> String {
-        // Build the endpoint URL for chat completions
-        let baseURL = endpoint.hasSuffix("/")
-            ? String(endpoint.dropLast())
-            : endpoint
-        let urlString = "\(baseURL)/v1/chat/completions"
-
-        guard let url = URL(string: urlString) else {
-            throw LLMError.invalidURL(urlString)
+        // 1. Build the URL safely
+        guard let baseURL = URL(string: endpoint) else {
+            throw LLMError.invalidURL(endpoint)
         }
+        let url = baseURL.appendingPathComponent("v1/chat/completions")
 
-        // Build the content array: images first (in order), then the text prompt
-        var contentItems: [[String: Any]] = []
+        // 2. Build the content items (Images then Text)
+        var contentItems: [ChatContentItem] = []
 
         for i in 1...screenshotCount {
             let filename = "SS_\(i).png"
@@ -47,43 +42,32 @@ struct LLMService {
             let base64String = imageData.base64EncodedString()
             let dataURI = "data:image/png;base64,\(base64String)"
 
-            contentItems.append([
-                "type": "image_url",
-                "image_url": ["url": dataURI]
-            ])
+            contentItems.append(.imageURL(url: dataURI))
         }
 
         guard !contentItems.isEmpty else {
             throw LLMError.noScreenshots
         }
 
-        // Add the text prompt
-        contentItems.append([
-            "type": "text",
-            "text": prompt
-        ])
+        contentItems.append(.text(prompt))
 
-        // Build the request body
-        let requestBody: [String: Any] = [
-            "model": model,
-            "messages": [
-                [
-                    "role": "user",
-                    "content": contentItems
-                ]
+        // 3. Construct the type-safe request body
+        let requestBody = ChatCompletionRequest(
+            model: model,
+            messages: [
+                .init(role: .user, content: contentItems)
             ],
-            "max_tokens": 4096
-        ]
+            maxTokens: 4096
+        )
 
-        let jsonData = try JSONSerialization.data(withJSONObject: requestBody)
-
+        // 4. Perform the Network Request
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer EMPTY", forHTTPHeaderField: "Authorization")
-        request.httpBody = jsonData
-        // Long timeout — large vision models can take a while
         request.timeoutInterval = 300
+        
+        request.httpBody = try JSONEncoder().encode(requestBody)
 
         let (data, response) = try await URLSession.shared.data(for: request)
 
@@ -96,17 +80,72 @@ struct LLMService {
             throw LLMError.serverError(statusCode: httpResponse.statusCode, body: body)
         }
 
-        // Parse the OpenAI-compatible response
-        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let choices = json["choices"] as? [[String: Any]],
-              let firstChoice = choices.first,
-              let message = firstChoice["message"] as? [String: Any],
-              let content = message["content"] as? String else {
-            throw LLMError.parseError(String(data: data, encoding: .utf8) ?? "")
+        // 5. Parse the response using Codable
+        do {
+            let result = try JSONDecoder().decode(ChatCompletionResponse.self, from: data)
+            return result.choices.first?.message.content ?? ""
+        } catch {
+            throw LLMError.parseError(String(data: data, encoding: .utf8) ?? "Unknown decoding error")
         }
-
-        return content
     }
+}
+
+// MARK: - Request/Response Models
+
+private struct ChatCompletionRequest: Encodable {
+    let model: String
+    let messages: [Message]
+    let maxTokens: Int
+
+    enum CodingKeys: String, CodingKey {
+        case model, messages
+        case maxTokens = "max_tokens"
+    }
+}
+
+private struct Message: Encodable {
+    let role: Role
+    let content: [ChatContentItem]
+
+    enum Role: String, Encodable {
+        case user, assistant, system
+    }
+}
+
+private enum ChatContentItem: Encodable {
+    case text(String)
+    case imageURL(url: String)
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        switch self {
+        case .text(let text):
+            try container.encode("text", forKey: .type)
+            try container.encode(text, forKey: .text)
+        case .imageURL(let url):
+            try container.encode("image_url", forKey: .type)
+            let imageURLContainer = ImageURLContainer(url: url)
+            try container.encode(imageURLContainer, forKey: .imageURL)
+        }
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case type, text, imageURL = "image_url"
+    }
+
+    private struct ImageURLContainer: Encodable {
+        let url: String
+    }
+}
+
+private struct ChatCompletionResponse: Decodable {
+    struct Choice: Decodable {
+        struct Message: Decodable {
+            let content: String
+        }
+        let message: Message
+    }
+    let choices: [Choice]
 }
 
 // MARK: - Errors
